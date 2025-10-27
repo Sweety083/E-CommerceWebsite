@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ecommerce-green
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ecommerce
+      version: green
+  template:
+    metadata:
+      labels:
+        app: ecommerce
+        version: green
+    spec:
+      containers:
+        - name: ecommerce
+          image: sweetyraj22/ecommerce:green
+          ports:
+            - containerPort: 80
