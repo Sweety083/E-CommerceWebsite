@@ -2,9 +2,8 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub')   // DockerHub credentials in Jenkins
-        KUBE_CONFIG = credentials('kubeconfig')             // kubeconfig file credentials in Jenkins
-        DOCKER_IMAGE = "sweetyraj22/ecommerce"              // DockerHub image repo
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub')   // DockerHub credentials ID in Jenkins
+        DOCKER_IMAGE = "sweetyraj22/ecommerce"             // DockerHub image repo
     }
 
     stages {
@@ -28,8 +27,10 @@ pipeline {
             steps {
                 script {
                     echo "📦 Pushing image to DockerHub..."
-                    sh "echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin"
-                    sh "docker push ${DOCKER_IMAGE}:${BUILD_NUMBER}"
+                    sh """
+                        echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin
+                        docker push ${DOCKER_IMAGE}:${BUILD_NUMBER}
+                    """
                 }
             }
         }
@@ -39,33 +40,33 @@ pipeline {
                 script {
                     echo "🚀 Starting Blue-Green Deployment..."
 
-                    // Write kubeconfig file to workspace
-                    writeFile file: 'kubeconfig', text: KUBE_CONFIG
-                    withEnv(["KUBECONFIG=${WORKSPACE}/kubeconfig"]) {
+                    // Use Jenkins kubeconfig file credential
+                    withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
 
-                        // Detect current color (blue or green)
+                        // Detect the current active color (blue or green)
                         def currentColor = sh(
                             script: "kubectl get svc ecommerce-service -o=jsonpath='{.spec.selector.version}' || echo 'none'",
                             returnStdout: true
                         ).trim()
 
                         def newColor = (currentColor == 'blue') ? 'green' : 'blue'
+
                         echo "🔹 Current Active Color: ${currentColor}"
                         echo "🟢 Deploying New Version to: ${newColor}"
 
-                        // Apply deployment manifests
+                        // Apply the new deployment manifest
                         sh "kubectl apply -f k8s/${newColor}-deployment.yaml"
 
-                        // Update the deployment image
+                        // Update deployment image
                         sh "kubectl set image deployment/ecommerce-${newColor} ecommerce=${DOCKER_IMAGE}:${BUILD_NUMBER}"
 
-                        // Wait for rollout completion
+                        // Wait for rollout to complete
                         sh "kubectl rollout status deployment/ecommerce-${newColor}"
 
-                        // Switch service traffic to new version
+                        // Switch service traffic to the new deployment
                         sh "kubectl patch svc ecommerce-service -p '{\"spec\":{\"selector\":{\"app\":\"ecommerce\",\"version\":\"${newColor}\"}}}'"
 
-                        echo "✅ Traffic switched to ${newColor} deployment successfully!"
+                        echo "✅ Traffic successfully switched to ${newColor} deployment!"
                     }
                 }
             }
@@ -81,3 +82,4 @@ pipeline {
         }
     }
 }
+
