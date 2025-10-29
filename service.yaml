@@ -5,8 +5,9 @@ metadata:
 spec:
   selector:
     app: ecommerce
-    version: blue   # initially points to blue
+    version: blue   # change this to green when switching versions
   ports:
     - port: 80
       targetPort: 80
-  type: LoadBalancer
+      nodePort: 30080     # you can choose any free port between 30000–32767
+  type: NodePort
