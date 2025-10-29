@@ -1,16 +1,15 @@
-FROM nginx:stable-alpine
+apiVersion: v1
+kind: Service
+metadata:
+  name: ecommerce-service
+spec:
+  selector:
+    app: ecommerce
+    version: blue   # initially points to blue
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 8500   # or any free port between 30000–32767
+  type: NodePort
 
-# Remove default nginx content
-RUN rm -rf /usr/share/nginx/html/*
-
-# Copy site
-COPY . /usr/share/nginx/html
-
-# Add a simple health-check endpoint (optional)
-# We'll ensure nginx serves index.html on /
-HEALTHCHECK --interval=15s --timeout=5s --start-period=5s \
-  CMD wget -qO- --spider http://localhost:80/ || exit 1
-
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
 
