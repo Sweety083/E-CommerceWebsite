@@ -5,8 +5,11 @@ metadata:
 spec:
   selector:
     app: ecommerce
-    version: blue   # initially points to blue
+    version: blue   # start with blue version
   ports:
     - port: 80
       targetPort: 80
-  type: LoadBalancer
+      nodePort: 30080   # must be between 30000–32767
+  type: NodePort
+
+
