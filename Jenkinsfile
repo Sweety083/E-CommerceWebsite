@@ -3,11 +3,14 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub')   // DockerHub credentials ID in Jenkins
-        DOCKER_IMAGE = "sweetyraj22/ecommerce"             // DockerHub image repo
+        DOCKER_IMAGE = "sweetyraj22/ecommerce"            // DockerHub image repo
+    }
+
+    parameters {
+        choice(name: 'TARGET_VERSION', choices: ['green', 'blue'], description: 'Select the target version to deploy')
     }
 
     stages {
-
         stage('Checkout Code') {
             steps {
                 git 'https://github.com/Sweety083/E-CommerceWebsite.git'
@@ -40,14 +43,8 @@ pipeline {
                 script {
                     echo "🚀 Starting Blue-Green Deployment..."
                     
-                    // Determine target version based on current version
-                    def currentVersion = sh(
-                        script: "kubectl get svc ecommerce-service -o=jsonpath='{.spec.selector.version}' || echo 'blue'",
-                        returnStdout: true
-                    ).trim()
-                    
-                    def targetVersion = currentVersion == 'blue' ? 'green' : 'blue'
-                    echo "Current version: ${currentVersion}, Target version: ${targetVersion}"
+                    def targetVersion = params.TARGET_VERSION
+                    echo "Target version: ${targetVersion}"
                     
                     // Tag the new image with target version
                     sh """
@@ -59,6 +56,7 @@ pipeline {
                     sh """
                         kubectl apply -f k8s/configmap-${targetVersion}.yaml
                         kubectl apply -f k8s/${targetVersion}-deployment.yaml
+                        kubectl set image deployment/ecommerce-${targetVersion} ecommerce=${DOCKER_IMAGE}:${BUILD_NUMBER}
                         kubectl rollout status deployment/ecommerce-${targetVersion} -n default
                     """
                     
@@ -79,27 +77,6 @@ pipeline {
                         echo "\\nPod status:"
                         kubectl get pods -l app=ecommerce,version=${targetVersion} -o wide
                     """
-                }
-
-                        def newColor = (currentColor == 'blue') ? 'green' : 'blue'
-
-                        echo "🔹 Current Active Color: ${currentColor}"
-                        echo "🟢 Deploying New Version to: ${newColor}"
-
-                        // Apply the new deployment manifest
-                        sh "kubectl apply -f k8s/${newColor}-deployment.yaml"
-
-                        // Update deployment image
-                        sh "kubectl set image deployment/ecommerce-${newColor} ecommerce=${DOCKER_IMAGE}:${BUILD_NUMBER}"
-
-                        // Wait for rollout to complete
-                        sh "kubectl rollout status deployment/ecommerce-${newColor}"
-
-                        // Switch service traffic to the new deployment
-                        sh "kubectl patch svc ecommerce-service -p '{\"spec\":{\"selector\":{\"app\":\"ecommerce\",\"version\":\"${newColor}\"}}}'"
-
-                        echo "✅ Traffic successfully switched to ${newColor} deployment!"
-                    }
                 }
             }
         }
