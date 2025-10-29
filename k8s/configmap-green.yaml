@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ecommerce-config-green
+  labels:
+    app: ecommerce
+    version: green
+data:
+  BANNER: "ECOMMERCE — GREEN (Staging)"
+  ENV: "staging"

@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ecommerce-config-blue
+  labels:
+    app: ecommerce
+    version: blue
+data:
+  BANNER: "ECOMMERCE — BLUE (Production)"
+  ENV: "production"
