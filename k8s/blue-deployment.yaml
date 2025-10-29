@@ -19,3 +19,6 @@ spec:
           image: sweetyraj22/ecommerce:blue
           ports:
             - containerPort: 80
+          envFrom:
+            - configMapRef:
+                name: ecommerce-config-blue
