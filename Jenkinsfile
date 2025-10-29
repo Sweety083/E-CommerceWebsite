@@ -39,15 +39,47 @@ pipeline {
             steps {
                 script {
                     echo "🚀 Starting Blue-Green Deployment..."
-
-                    // Use Jenkins kubeconfig file credential
-                    withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
-
-                        // Detect the current active color (blue or green)
-                        def currentColor = sh(
-                            script: "kubectl get svc ecommerce-service -o=jsonpath='{.spec.selector.version}' || echo 'none'",
-                            returnStdout: true
-                        ).trim()
+                    
+                    // Determine target version based on current version
+                    def currentVersion = sh(
+                        script: "kubectl get svc ecommerce-service -o=jsonpath='{.spec.selector.version}' || echo 'blue'",
+                        returnStdout: true
+                    ).trim()
+                    
+                    def targetVersion = currentVersion == 'blue' ? 'green' : 'blue'
+                    echo "Current version: ${currentVersion}, Target version: ${targetVersion}"
+                    
+                    // Tag the new image with target version
+                    sh """
+                        docker tag ${DOCKER_IMAGE}:${BUILD_NUMBER} ${DOCKER_IMAGE}:${targetVersion}
+                        docker push ${DOCKER_IMAGE}:${targetVersion}
+                    """
+                    
+                    // Deploy new version
+                    sh """
+                        kubectl apply -f k8s/configmap-${targetVersion}.yaml
+                        kubectl apply -f k8s/${targetVersion}-deployment.yaml
+                        kubectl rollout status deployment/ecommerce-${targetVersion} -n default
+                    """
+                    
+                    // Wait for user confirmation before switching traffic
+                    input message: "Switch traffic to ${targetVersion} version?"
+                    
+                    // Switch traffic
+                    sh """
+                        kubectl patch service ecommerce-service -p '{"spec":{"selector":{"app":"ecommerce","version":"${targetVersion}"}}}'
+                    """
+                    
+                    echo "✅ Traffic switched to ${targetVersion} version"
+                    
+                    // Verify deployment
+                    sh """
+                        echo "Current service routing:"
+                        kubectl get svc ecommerce-service -o=jsonpath='{.spec.selector.version}'; echo
+                        echo "\\nPod status:"
+                        kubectl get pods -l app=ecommerce,version=${targetVersion} -o wide
+                    """
+                }
 
                         def newColor = (currentColor == 'blue') ? 'green' : 'blue'
 

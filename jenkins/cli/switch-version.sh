@@ -1,41 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Switch traffic between blue/green versions and verify the switch
-switch_version() {
-  local target_version="$1"
-  
-  echo "Switching traffic to version: $target_version"
-  
-  # Patch the service selector
-  kubectl patch service ecommerce-service -p "{\"spec\":{\"selector\":{\"app\":\"ecommerce\",\"version\":\"${target_version}\"}}}"
-  
-  # Confirm the switch
-  local current_version
-  current_version=$(kubectl get svc ecommerce-service -o=jsonpath='{.spec.selector.version}')
-  echo "Service now routing to: $current_version"
-  
-  # Show pods for the new version
-  echo "Pods for version $current_version:"
-  kubectl get pods -l "app=ecommerce,version=${current_version}" -o wide
-  
-  # Verify a pod exists and show its content
-  local pod
-  pod=$(kubectl get pods -l "app=ecommerce,version=${current_version}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-  if [[ -n "$pod" ]]; then
-    echo "Content from pod $pod:"
-    kubectl exec -it "$pod" -- cat /usr/share/nginx/html/index.html || true
-  else 
-    echo "No pod found for version=$current_version"
-    return 1
-  fi
-}
+# Switch service to route traffic to green version
+echo "Switching traffic to GREEN version..."
+kubectl patch service ecommerce-service -p '{"spec":{"selector":{"app":"ecommerce","version":"green"}}}'
 
-# Main execution
-if [[ "${1:-}" == "--help" || $# -eq 0 ]]; then
-  echo "Usage: $0 <target-version>"
-  echo "Example: $0 green"
-  exit 1
-fi
+# Show new routing
+echo -e "\nService is now routing to:"
+kubectl get svc ecommerce-service -o=jsonpath='{.spec.selector.version}'; echo
 
-switch_version "$1"
+# Show pod status
+echo -e "\nPods status:"
+kubectl get pods -l app=ecommerce -L version
+
+# Monitor pod readiness
+echo -e "\nMonitoring GREEN pods readiness..."
+kubectl wait --for=condition=ready pod -l "app=ecommerce,version=green" --timeout=60s
+
+echo -e "\nAccess the app to verify GREEN version:"
+echo "1. Using port-forward (recommended):"
+echo "   kubectl port-forward svc/ecommerce-service 8080:80"
+echo "   Then open: http://localhost:8080"
+echo
+echo "2. Using minikube:"
+echo "   minikube service ecommerce-service --url"

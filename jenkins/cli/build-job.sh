@@ -6,6 +6,12 @@ JENKINS_URL=""
 JOB_NAME=""
 PARAMS=""
 
+# Check required env vars
+if [ -z "${JENKINS_USER:-}" ] || [ -z "${JENKINS_TOKEN:-}" ]; then
+  echo "Error: JENKINS_USER and JENKINS_TOKEN environment variables must be set"
+  exit 1
+fi
+
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -42,7 +48,11 @@ fi
 
 # Trigger the build
 BUILD_URL="${JENKINS_URL}/job/${JOB_NAME}/buildWithParameters?${PARAMS#&}"
+echo "Getting Jenkins crumb..."
+CRUMB=$(curl -s --user "$JENKINS_USER:$JENKINS_TOKEN" "$JENKINS_URL/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,\":\",//crumb)")
+
 echo "Triggering build: $BUILD_URL"
-curl -sS -X POST \
+curl -X POST -L -s \
   --user "$JENKINS_USER:$JENKINS_TOKEN" \
+  -H "$CRUMB" \
   "$BUILD_URL"
