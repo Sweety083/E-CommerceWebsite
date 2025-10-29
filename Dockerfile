@@ -1,16 +1,16 @@
-FROM nginx:stable-alpine
+# Use nginx as base image
+FROM nginx:alpine
 
-# Remove default nginx content
-RUN rm -rf /usr/share/nginx/html/*
+# Copy all HTML, CSS, and JS files
+COPY *.html /usr/share/nginx/html/
+COPY css/ /usr/share/nginx/html/css/
+COPY js/ /usr/share/nginx/html/js/
+COPY img/ /usr/share/nginx/html/img/
 
-# Copy site
-COPY . /usr/share/nginx/html
-
-# Add a simple health-check endpoint (optional)
-# We'll ensure nginx serves index.html on /
-HEALTHCHECK --interval=15s --timeout=5s --start-period=5s \
-  CMD wget -qO- --spider http://localhost:80/ || exit 1
-
+# Expose port 80
 EXPOSE 80
+
+# Start nginx
 CMD ["nginx", "-g", "daemon off;"]
+
 

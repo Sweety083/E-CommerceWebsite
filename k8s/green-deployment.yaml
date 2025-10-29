@@ -19,3 +19,6 @@ spec:
           image: sweetyraj22/ecommerce:green
           ports:
             - containerPort: 80
+          envFrom:
+            - configMapRef:
+                name: ecommerce-config-green
